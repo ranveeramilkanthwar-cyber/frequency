@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frequency — Synth Music Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--purple:#a855f7;--cyan:#06b6d4;--pink:#ec4899;--orange:#f97316;--bg:#050010;--card:rgba(255,255,255,.03);--border:rgba(255,255,255,.06)}
+body{background:var(--bg);color:#fff;font-family:'Space Grotesk',sans-serif;overflow-x:hidden;min-height:100vh}
+canvas#vis{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+.grid-overlay{position:fixed;inset:0;background-image:linear-gradient(rgba(168,85,247,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.04) 1px,transparent 1px);background-size:60px 60px;z-index:1;pointer-events:none}
+main{position:relative;z-index:2}
+nav{display:flex;justify-content:space-between;align-items:center;padding:1.2rem 3rem;background:rgba(5,0,16,.7);backdrop-filter:blur(20px);border-bottom:1px solid rgba(168,85,247,.2);position:sticky;top:0;z-index:100}
+.brand{font-family:'Space Mono',monospace;font-size:1.2rem;color:var(--purple);letter-spacing:.1em;text-shadow:0 0 20px rgba(168,85,247,.5)}
+.bpm-display{font-family:'Space Mono',monospace;font-size:.8rem;color:rgba(255,255,255,.4);display:flex;align-items:center;gap.5rem}
+.bpm-val{color:var(--purple);font-size:1.1rem;font-weight:bold;animation:bpmPulse 0.5s ease-in-out infinite alternate}
+@keyframes bpmPulse{from{opacity:.6}to{opacity:1;text-shadow:0 0 10px var(--purple)}}
+.hero{min-height:50vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem;position:relative}
+.hero h1{font-size:clamp(3rem,8vw,7rem);font-weight:700;letter-spacing:-.04em;background:linear-gradient(135deg,#fff,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem}
+.hero-sub{font-family:'Space Mono',monospace;font-size:.85rem;color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2rem}
+.viz-selector{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin-bottom:2rem}
+.viz-btn{background:var(--card);border:1px solid var(--border);color:rgba(255,255,255,.6);padding:.5rem 1.2rem;font-family:'Space Mono',monospace;font-size:.75rem;cursor:pointer;transition:.2s;letter-spacing:.05em;border-radius:4px}
+.viz-btn:hover,.viz-btn.active{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,.08)}
+.tracks{padding:3rem;max-width:1300px;margin:0 auto}
+.tracks h2{font-size:1.5rem;font-weight:700;margin-bottom.5rem;letter-spacing:-.02em;display:flex;align-items:center;gap.5rem}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:dot 2s infinite;margin-right:.5rem;display:inline-block}
+@keyframes dot{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.7)}70%{box-shadow:0 0 0 6px transparent}}
+.tracks-grid{display:grid;gap:1px;margin-top:1.5rem}
+.track-row{display:grid;grid-template-columns:40px 1fr auto auto auto;align-items:center;gap:1.5rem;padding:1rem 1.5rem;background:var(--card);border:1px solid var(--border);cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.track-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tc);opacity:0;transition:.3s}
+.track-row:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+.track-row:hover::before{opacity:1}
+.track-row.playing{border-color:var(--tc);background:rgba(168,85,247,.06)}
+.track-row.playing::before{opacity:1}
+.track-num{font-family:'Space Mono',monospace;font-size:.85rem;color:rgba(255,255,255,.3);text-align:center}
+.track-info{min-width:0}
+.track-title{font-size:.95rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.2rem}
+.track-artist{font-size:.75rem;color:rgba(255,255,255,.4);font-family:'Space Mono',monospace}
+.track-bpm{font-family:'Space Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.4)}
+.track-dur{font-family:'Space Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.4)}
+.track-like{background:none;border:none;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.3);transition:.2s;padding:.3rem}
+.track-like:hover{color:var(--pink)}
+.track-liked{color:var(--pink)}
+.now-playing{position:fixed;bottom:0;left:0;right:0;background:rgba(5,0,16,.95);backdrop-filter:blur(30px);border-top:1px solid rgba(168,85,247,.3);padding:1rem 2rem;display:flex;align-items:center;gap:2rem;z-index:100}
+.np-info{flex:1;min-width:0}
+.np-title{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-artist{font-size:.75rem;color:rgba(255,255,255,.4);font-family:'Space Mono',monospace}
+.np-controls{display:flex;gap:1rem;align-items:center}
+.ctrl-btn{background:none;border:none;color:rgba(255,255,255,.6);font-size:1.2rem;cursor:pointer;transition:.2s;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.ctrl-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+.play-btn{background:linear-gradient(135deg,var(--purple),var(--pink))!important;color:#fff!important;font-size:.9rem}
+.waveform{flex:1;height:40px;position:relative;overflow:hidden;border-radius:4px;background:rgba(255,255,255,.02)}
+canvas#wave{width:100%;height:100%}
+.stats-strip{display:flex;gap:3rem;padding:2rem 3rem;justify-content:center;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:2rem 0;background:rgba(168,85,247,.02)}
+.stat-item{text-align:center}
+.stat-val{font-size:2rem;font-weight:700;font-family:'Space Mono',monospace;background:linear-gradient(135deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:block}
+.stat-lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-top:.2rem}
+footer{text-align:center;padding:5rem 3rem 3rem;color:rgba(255,255,255,.2);font-size:.75rem;border-top:1px solid var(--border);font-family:'Space Mono',monospace}
+</style></head><body>
+<canvas id="vis"></canvas>
+<div class="grid-overlay"></div>
+<main>
+<nav>
+  <div class="brand">◈ FREQUENCY</div>
+  <div class="bpm-display">BPM <span class="bpm-val" id="bpm-val">128</span></div>
+</nav>
+<section class="hero">
+  <h1>FREQUENCY</h1>
+  <p class="hero-sub">Synthwave · Techno · Ambient · Space · Industrial</p>
+  <div class="viz-selector">
+    <button class="viz-btn active" onclick="setViz('bars',this)">Frequency Bars</button>
+    <button class="viz-btn" onclick="setViz('circular',this)">Circular Wave</button>
+    <button class="viz-btn" onclick="setViz('particles',this)">Particles</button>
+    <button class="viz-btn" onclick="setViz('oscilloscope',this)">Oscilloscope</button>
+  </div>
+</section>
+<div class="stats-strip" id="stats-strip">
+  <div class="stat-item"><span class="stat-val" id="s-tracks">6</span><span class="stat-lbl">Tracks</span></div>
+  <div class="stat-item"><span class="stat-val" id="s-plays">1.9M</span><span class="stat-lbl">Total Plays</span></div>
+  <div class="stat-item"><span class="stat-val" id="s-bpm">117</span><span class="stat-lbl">Avg BPM</span></div>
+  <div class="stat-item"><span class="stat-val" id="s-genres">6</span><span class="stat-lbl">Genres</span></div>
+</div>
+<section class="tracks">
+  <h2><span class="live-dot"></span> Now Streaming</h2>
+  <div class="tracks-grid" id="tracks-grid"><div style="text-align:center;padding:2rem;color:rgba(255,255,255,.3)">Loading tracks...</div></div>
+</section>
+</main>
+<div class="now-playing" id="now-playing" style="display:none">
+  <div class="np-info"><div class="np-title" id="np-title">Track Name</div><div class="np-artist" id="np-artist">Artist</div></div>
+  <div class="np-controls">
+    <button class="ctrl-btn" onclick="prevTrack()">⏮</button>
+    <button class="ctrl-btn play-btn" id="play-btn" onclick="togglePlay()">▶</button>
+    <button class="ctrl-btn" onclick="nextTrack()">⏭</button>
+  </div>
+  <div class="waveform"><canvas id="wave"></canvas></div>
+</div>
+<footer>◈ FREQUENCY — Synth Music Visualizer | Express.js :3005 | React+WebAudio+Canvas Frontend</footer>
+<script>
+const API="http://localhost:3005";
+let tracks=[],currentIdx=0,playing=false,vizMode="bars",animT=0;
+
+// Main visualizer canvas
+const vis=document.getElementById("vis");const vctx=vis.getContext("2d");
+function resize(){vis.width=innerWidth;vis.height=innerHeight;const wc=document.getElementById("wave");wc.width=wc.offsetWidth;wc.height=wc.offsetHeight}
+window.addEventListener("resize",resize);resize();
+
+// Simulated audio data
+function getFakeFFT(bpm){const beat=Math.sin(Date.now()*bpm/60000*Math.PI*2);const bars=64;return Array.from({length:bars},(_,i)=>{const freq=Math.sin(Date.now()*0.001+i*0.3+beat)*0.5+0.5;const shape=Math.pow(1-i/bars,0.5);return freq*shape*(0.5+Math.abs(beat)*0.5)})}
+
+function drawBars(fft,color){vctx.clearRect(0,0,vis.width,vis.height);const bg=vctx.createLinearGradient(0,0,0,vis.height);bg.addColorStop(0,"#050010");bg.addColorStop(1,"#0a0025");vctx.fillStyle=bg;vctx.fillRect(0,0,vis.width,vis.height);const w=vis.width/fft.length;fft.forEach((v,i)=>{const h=v*vis.height*0.6;const g=vctx.createLinearGradient(0,vis.height,0,vis.height-h);g.addColorStop(0,color||"#a855f7");g.addColorStop(1,"transparent");vctx.fillStyle=g;vctx.fillRect(i*w,vis.height-h,w-2,h)})}
+
+function drawCircular(fft,color){vctx.clearRect(0,0,vis.width,vis.height);vctx.fillStyle="#050010";vctx.fillRect(0,0,vis.width,vis.height);const cx=vis.width/2,cy=vis.height/2,r=Math.min(cx,cy)*0.3;fft.forEach((v,i)=>{const a=(i/fft.length)*Math.PI*2-Math.PI/2;const r2=r+v*r;vctx.strokeStyle=color||"#a855f7";vctx.globalAlpha=0.7;vctx.lineWidth=2;vctx.beginPath();vctx.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);vctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);vctx.stroke()});vctx.globalAlpha=1}
+
+function drawParticles(fft){vctx.fillStyle="rgba(5,0,16,0.15)";vctx.fillRect(0,0,vis.width,vis.height);const cx=vis.width/2,cy=vis.height/2;fft.forEach((v,i)=>{if(v>0.4){const a=(i/fft.length)*Math.PI*2;const sp=v*15;const px=cx+Math.cos(a+animT)*300;const py=cy+Math.sin(a+animT)*200;vctx.fillStyle=`hsla(${i*5+animT*30},80%,60%,${v})`;vctx.beginPath();vctx.arc(px,py,v*8,0,Math.PI*2);vctx.fill()}})}
+
+function drawOscilloscope(fft,color){vctx.clearRect(0,0,vis.width,vis.height);vctx.fillStyle="#050010";vctx.fillRect(0,0,vis.width,vis.height);vctx.strokeStyle=color||"#06b6d4";vctx.lineWidth=2;vctx.beginPath();fft.forEach((v,i)=>{const x=(i/fft.length)*vis.width;const y=vis.height/2+Math.sin(i*0.5+animT)*v*vis.height*0.3;i===0?vctx.moveTo(x,y):vctx.lineTo(x,y)});vctx.stroke()}
+
+function animate(){const track=tracks[currentIdx];const bpm=track?.bpm||120;const color=track?.waveColor||"#a855f7";const fft=getFakeFFT(bpm);if(vizMode==="bars")drawBars(fft,color);else if(vizMode==="circular")drawCircular(fft,color);else if(vizMode==="particles")drawParticles(fft);else drawOscilloscope(fft,color);// Waveform
+const wc=document.getElementById("wave");if(wc){const wctx=wc.getContext("2d");wctx.clearRect(0,0,wc.width,wc.height);wctx.strokeStyle=color;wctx.lineWidth=1.5;wctx.beginPath();for(let i=0;i<wc.width;i++){const t=i/wc.width;const y=wc.height/2+Math.sin(t*20+animT*5)*wc.height*0.3*getFakeFFT(bpm)[Math.floor(t*64)];i===0?wctx.moveTo(i,y):wctx.lineTo(i,y)}wctx.stroke()}
+if(playing)document.getElementById("bpm-val").textContent=bpm;animT+=0.02;requestAnimationFrame(animate)}
+animate();
+
+async function api(p,m="GET",b){try{const r=await fetch(API+p,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});return await r.json()}catch{return null}}
+
+async function loadTracks(){
+  const r=await api("/api/tracks");if(!r?.data)return;
+  tracks=r.data;
+  document.getElementById("tracks-grid").innerHTML=tracks.map((t,i)=>`
+    <div class="track-row" id="tr-${t.id}" style="--tc:${t.waveColor}" onclick="playTrack(${i})">
+      <div class="track-num">${String(i+1).padStart(2,"0")}</div>
+      <div class="track-info"><div class="track-title">${t.title}</div><div class="track-artist">${t.artist} · ${t.genre}</div></div>
+      <div class="track-bpm">${t.bpm} BPM</div>
+      <div class="track-dur">${Math.floor(t.duration/60)}:${String(t.duration%60).padStart(2,"0")}</div>
+      <button class="track-like" id="like-${t.id}" onclick="likeTrack(event,${t.id})">${(t.liked/1000).toFixed(0)}K ♡</button>
+    </div>`).join("");
+}
+
+function playTrack(idx){
+  currentIdx=idx;playing=true;
+  const t=tracks[idx];
+  document.querySelectorAll(".track-row").forEach(r=>r.classList.remove("playing"));
+  document.getElementById(`tr-${t.id}`)?.classList.add("playing");
+  document.getElementById("now-playing").style.display="flex";
+  document.getElementById("np-title").textContent=t.title;
+  document.getElementById("np-artist").textContent=`${t.artist} · ${t.bpm} BPM`;
+  document.getElementById("play-btn").textContent="⏸";
+  document.getElementById("bpm-val").textContent=t.bpm;
+  document.body.style.setProperty("--cur-color",t.waveColor);
+}
+
+function togglePlay(){playing=!playing;document.getElementById("play-btn").textContent=playing?"⏸":"▶"}
+function nextTrack(){playTrack((currentIdx+1)%tracks.length)}
+function prevTrack(){playTrack((currentIdx-1+tracks.length)%tracks.length)}
+
+async function likeTrack(e,id){e.stopPropagation();const r=await api(`/api/like/${id}`,"POST");if(r?.liked)document.getElementById(`like-${id}`).textContent=`${(r.liked/1000).toFixed(0)}K ♥`}
+
+function setViz(mode,btn){vizMode=mode;document.querySelectorAll(".viz-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active")}
+
+async function loadStats(){const r=await api("/api/stats");if(r?.stats){document.getElementById("s-tracks").textContent=r.stats.totalTracks;document.getElementById("s-plays").textContent=(r.stats.totalPlays/1e6).toFixed(1)+"M";document.getElementById("s-bpm").textContent=r.stats.avgBpm;document.getElementById("s-genres").textContent=r.stats.genres}}
+
+loadTracks();loadStats();
+</script></body></html>
